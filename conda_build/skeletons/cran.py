@@ -74,8 +74,9 @@ CRAN_META = """\
 {version_binary1}
 {version_binary2}
 
-{{% set posix = 'm2-' if win else '' %}}
-{{% set native = 'm2w64-' if win else '' %}}
+{{% set posix = '{msys2_msys_pkg_prefix}' if win else '' %}}
+{{% set native_build = '{msys2_mingw_w64_build_pkg_prefix}' if win else '' %}}
+{{% set native_host = '{msys2_mingw_w64_host_pkg_prefix}' if win else '' %}}
 
 package:
   name: {packagename}
@@ -1054,6 +1055,18 @@ def skeletonize(
                     sys.exit(1)
             cran_package = None
 
+        with TemporaryDirectory() as t:
+            variants = get_package_variants(t, config)[0]
+            # from pprint import pprint
+            # pprint(variants)
+            msys2_msys_prefix = variants.get('msys2_msys_prefix', 'm2')
+            msys2_msys_pkg_prefix = f"{msys2_msys_prefix}-" if msys2_msys_prefix else ''
+            msys2_mingw_w64_build_prefix = variants.get('msys2_mingw_w64_build_prefix', 'm2w64')
+            msys2_mingw_w64_build_pkg_prefix = f"{msys2_mingw_w64_build_prefix}-" if msys2_mingw_w64_build_prefix else ''
+            msys2_mingw_w64_host_prefix = variants.get('msys2_mingw_w64_host_prefix', 'm2w64')
+            msys2_mingw_w64_host_pkg_prefix = f"{msys2_mingw_w64_host_prefix}-" if msys2_mingw_w64_host_prefix else ''
+
+
         if cran_package is not None:
             package = cran_package["Package"]
             version = cran_package["Version"]
@@ -1078,6 +1091,10 @@ def skeletonize(
                 "summary": "",
                 "binary1": "",
                 "binary2": "",
+                # MSYS2
+                "msys2_msys_pkg_prefix": msys2_msys_pkg_prefix,
+                "msys2_mingw_w64_build_pkg_prefix": msys2_mingw_w64_build_pkg_prefix,
+                "msys2_mingw_w64_host_pkg_prefix": msys2_mingw_w64_host_pkg_prefix,
             }
         )
 
@@ -1472,21 +1489,21 @@ def skeletonize(
                         f"{INDENT}{{{{ compiler('c') }}}}            {sel_src_not_win}"
                     )
                     deps.append(
-                        f"{INDENT}{{{{ compiler('m2w64_c') }}}}      {sel_src_and_win}"
+                        f"{INDENT}{{{{ compiler('{msys2_mingw_w64_build_prefix}_c') }}}}      {sel_src_and_win}"
                     )
                 if need_cxx:
                     deps.append(
                         f"{INDENT}{{{{ compiler('cxx') }}}}          {sel_src_not_win}"
                     )
                     deps.append(
-                        f"{INDENT}{{{{ compiler('m2w64_cxx') }}}}    {sel_src_and_win}"
+                        f"{INDENT}{{{{ compiler('{msys2_mingw_w64_build_prefix}_cxx') }}}}    {sel_src_and_win}"
                     )
                 if need_f:
                     deps.append(
                         f"{INDENT}{{{{ compiler('fortran') }}}}      {sel_src_not_win}"
                     )
                     deps.append(
-                        f"{INDENT}{{{{ compiler('m2w64_fortran') }}}}{sel_src_and_win}"
+                        f"{INDENT}{{{{ compiler('{msys2_mingw_w64_build_prefix}_fortran') }}}}{sel_src_and_win}"
                     )
                 if use_rtools_win:
                     need_c = need_cxx = need_f = need_autotools = need_make = False
@@ -1532,7 +1549,7 @@ def skeletonize(
             elif dep_type == "run":
                 if need_c or need_cxx or need_f:
                     deps.append(
-                        f"{INDENT}{{{{native}}}}gcc-libs       {sel_src_and_win}"
+                        f"{INDENT}{{{{ native_build }}}}gcc-libs       {sel_src_and_win}"
                     )
 
             if dep_type == "host" or dep_type == "run":
